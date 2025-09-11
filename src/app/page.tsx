@@ -34,73 +34,57 @@ const CopyIcon = () => (
 
 
 export default function QuoteGeneratorPage() {
-  // Array of quotes to be displayed randomly
-  const quotes = [
-    {
-      text: "The only way to do great work is to love what you do.",
-      author: "Steve Jobs",
-    },
-    {
-      text: "The greatest glory in living lies not in never falling, but in rising every time we fall.",
-      author: "Nelson Mandela",
-    },
-    {
-      text: "The future belongs to those who believe in the beauty of their dreams.",
-      author: "Eleanor Roosevelt",
-    },
-    {
-      text: "It is during our darkest moments that we must focus to see the light.",
-      author: "Aristotle",
-    },
-    {
-      text: "Whoever is happy will make others happy too.",
-      author: "Anne Frank",
-    },
-    {
-        text: "The purpose of our lives is to be happy.",
-        author: "Dalai Lama"
-    },
-    {
-        text: "You only live once, but if you do it right, once is enough.",
-        author: "Mae West"
-    }
-  ];
-
   // State to hold the current quote
-  const [currentQuote, setCurrentQuote] = useState(quotes[0]);
+  const [currentQuote, setCurrentQuote] = useState<{ text: string; author: string } | null>(null);
+  // State to manage loading and error
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // State to manage the text of the copy button
   const [copyButtonText, setCopyButtonText] = useState("Copy");
 
+  // Fetch a random quote from the backend API
+  const fetchRandomQuote = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/random-quote");
+      if (!res.ok) throw new Error("Failed to fetch quote");
+      const data = await res.json();
+      setCurrentQuote({ text: data.text, author: data.author });
+    } catch (err: any) {
+      setError(err.message || "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch a quote on initial load
+  React.useEffect(() => {
+    fetchRandomQuote();
+  }, []);
   // Function to get a new random quote
   const handleNewQuote = () => {
-    let randomIndex;
-    // Ensure the new quote is different from the current one
-    do {
-      randomIndex = Math.floor(Math.random() * quotes.length);
-    } while (quotes[randomIndex].text === currentQuote.text);
-
-    setCurrentQuote(quotes[randomIndex]);
+    fetchRandomQuote();
   };
 
   // Function to copy the current quote to the clipboard
   const handleCopyQuote = () => {
+    if (!currentQuote) return;
     const quoteToCopy = `"${currentQuote.text}" - ${currentQuote.author}`;
-    
     // Using a temporary textarea element to facilitate the copy command
     const textArea = document.createElement("textarea");
     textArea.value = quoteToCopy;
     document.body.appendChild(textArea);
     textArea.select();
     try {
-        document.execCommand('copy');
-        setCopyButtonText("Copied!");
+      document.execCommand('copy');
+      setCopyButtonText("Copied!");
     } catch (err) {
-        console.error('Failed to copy text: ', err);
-        setCopyButtonText("Failed");
+      console.error('Failed to copy text: ', err);
+      setCopyButtonText("Failed");
     }
     document.body.removeChild(textArea);
-
     // Reset the button text after 2 seconds
     setTimeout(() => {
       setCopyButtonText("Copy");
@@ -123,12 +107,20 @@ export default function QuoteGeneratorPage() {
           {/* Quote Display Card */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg p-8 sm:p-12 md:p-16 w-full max-w-3xl min-h-[250px] flex flex-col justify-center items-center transform transition-all duration-300 mx-auto">
             <blockquote className="text-center">
-              <p className="text-xl sm:text-2xl md:text-3xl font-medium text-gray-700 leading-relaxed">
-                "{currentQuote.text}"
-              </p>
-              <footer className="mt-6 text-md sm:text-lg text-gray-500">
-                - {currentQuote.author}
-              </footer>
+              {loading ? (
+                <p className="text-xl sm:text-2xl md:text-3xl font-medium text-gray-700 leading-relaxed">Loading...</p>
+              ) : error ? (
+                <p className="text-xl sm:text-2xl md:text-3xl font-medium text-red-500 leading-relaxed">{error}</p>
+              ) : currentQuote ? (
+                <>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-medium text-gray-700 leading-relaxed">
+                    "{currentQuote.text}"
+                  </p>
+                  <footer className="mt-6 text-md sm:text-lg text-gray-500">
+                    - {currentQuote.author}
+                  </footer>
+                </>
+              ) : null}
             </blockquote>
           </div>
 
@@ -137,12 +129,14 @@ export default function QuoteGeneratorPage() {
             <button 
               onClick={handleNewQuote}
               className="px-8 py-3 bg-gray-900 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-opacity-75 transition-transform transform hover:scale-105"
+              disabled={loading}
             >
-              Get new quote
+              {loading ? "Loading..." : "Get new quote"}
             </button>
             <button
               onClick={handleCopyQuote}
               className="px-8 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-all duration-300 flex items-center justify-center"
+              disabled={loading || !currentQuote}
             >
               <CopyIcon />
               {copyButtonText}
